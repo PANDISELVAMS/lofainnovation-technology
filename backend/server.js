@@ -17,7 +17,7 @@ app.set("trust proxy", 1);
 // CORS
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://lofainovationtechnology.vercel.app",
+  "https://lofainnovationtechnology.vercel.app",
 ];
 
 app.use(
