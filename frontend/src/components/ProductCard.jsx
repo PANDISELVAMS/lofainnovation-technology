@@ -8,7 +8,19 @@ const statusStyles = {
   "Coming Soon": "bg-white/10 text-white/60",
 };
 
+// Admin might type "example.com" without https:// — add it so the link
+// opens the external site instead of a broken relative URL.
+const normalizeUrl = (url) => {
+  if (!url) return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+};
+
 export default function ProductCard({ product, index }) {
+  const launchHref = normalizeUrl(product.launchUrl);
+  const demoHref = normalizeUrl(product.demoUrl);
+
   return (
     <motion.div initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: (index % 3) * 0.1 }} className="glass-card overflow-hidden">
       <div className="relative">
@@ -22,8 +34,24 @@ export default function ProductCard({ product, index }) {
           {(product.technology || []).map((t) => (<span key={t} className="rounded-full bg-white/5 px-2.5 py-1 text-[11px] text-white/50">{t}</span>))}
         </div>
         <div className="mt-5 flex gap-3">
-          <button className="btn-primary flex-1 justify-center !py-2 text-sm"><FaRocket className="text-xs" /> Launch</button>
-          <button className="btn-outline flex-1 justify-center !py-2 text-sm"><FaPlayCircle className="text-xs" /> Demo</button>
+          {launchHref ? (
+            <a href={launchHref} target="_blank" rel="noreferrer" className="btn-primary flex-1 justify-center !py-2 text-sm">
+              <FaRocket className="text-xs" /> Launch
+            </a>
+          ) : (
+            <span title="Link not added yet" className="btn-primary pointer-events-none flex-1 justify-center !py-2 text-sm opacity-40">
+              <FaRocket className="text-xs" /> Launch
+            </span>
+          )}
+          {demoHref ? (
+            <a href={demoHref} target="_blank" rel="noreferrer" className="btn-outline flex-1 justify-center !py-2 text-sm">
+              <FaPlayCircle className="text-xs" /> Demo
+            </a>
+          ) : (
+            <span title="Demo not available yet" className="btn-outline pointer-events-none flex-1 justify-center !py-2 text-sm opacity-40">
+              <FaPlayCircle className="text-xs" /> Demo
+            </span>
+          )}
         </div>
       </div>
     </motion.div>

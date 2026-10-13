@@ -8,6 +8,8 @@ const productSchema = new mongoose.Schema(
     features: [String],
     technology: [String],
     status: { type: String, enum: ["Coming Soon", "Live", "Beta", "New"], default: "Coming Soon" },
+    launchUrl: String, // opens when the "Launch" button is clicked (live product link)
+    demoUrl: String,   // opens when the "Demo" button is clicked
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true }
