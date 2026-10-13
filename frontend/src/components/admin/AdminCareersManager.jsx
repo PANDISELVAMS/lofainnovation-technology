@@ -1,97 +1,315 @@
+
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { FaPlus, FaTrash, FaEdit, FaSave, FaTimes } from "react-icons/fa";
+import {
+  FaPlus,
+  FaTrash,
+  FaEdit,
+  FaSave,
+  FaTimes,
+} from "react-icons/fa";
+
 import api from "../../services/api";
 
-const emptyForm = { title: "", type: "Full-time", location: "Remote", experience: "", description: "", requirements: "", isActive: true };
+const emptyForm = {
+  title: "",
+  type: "Full-time",
+  location: "Remote",
+  experience: "",
+  description: "",
+  requirements: "",
+  isActive: true,
+};
 
-// Requirements are typed one per line in the admin form, stored as an array.
-const linesToArray = (str) => str.split("\n").map((s) => s.trim()).filter(Boolean);
-const arrayToLines = (arr) => (arr || []).join("\n");
+const linesToArray = (str) =>
+  (str || "")
+    .split("\n")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+const arrayToLines = (arr) =>
+  (Array.isArray(arr) ? arr : []).join("\n");
 
 export default function AdminCareersManager() {
   const [positions, setPositions] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState({ ...emptyForm });
 
-  const load = () => api.get("/admin/positions").then((res) => setPositions(res.data)).catch(() => toast.error("Could not load positions"));
-  useEffect(load, []);
-
-  const startAdd = () => { setAdding(true); setEditingId(null); setForm(emptyForm); };
-  const startEdit = (p) => { setEditingId(p._id); setAdding(false); setForm({ ...emptyForm, ...p, requirements: arrayToLines(p.requirements) }); };
-  const cancel = () => { setAdding(false); setEditingId(null); setForm(emptyForm); };
-
-  const submit = async (e) => {
-    e.preventDefault();
-    if (!form.title.trim()) { toast.error("Position title is required"); return; }
-    const payload = { ...form, requirements: linesToArray(form.requirements) };
+  // Load positions without returning a Promise from useEffect.
+  const load = async () => {
     try {
-      if (editingId) { await api.put(`/admin/positions/${editingId}`, payload); toast.success("Position updated"); }
-      else { await api.post("/admin/positions", payload); toast.success("Position added"); }
-      cancel(); load();
-    } catch (err) { toast.error(err.response?.data?.message || "Could not save"); }
+      const res = await api.get("/admin/positions");
+
+      setPositions(Array.isArray(res.data) ? res.data : []);
+    } catch (error) {
+      console.error("Failed to load positions:", error);
+      toast.error("Could not load positions");
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const updateField = (field, value) => {
+    setForm((previous) => ({
+      ...previous,
+      [field]: value,
+    }));
+  };
+
+  const startAdd = () => {
+    setAdding(true);
+    setEditingId(null);
+    setForm({ ...emptyForm });
+  };
+
+  const startEdit = (position) => {
+    setEditingId(position._id);
+    setAdding(false);
+
+    setForm({
+      ...emptyForm,
+      ...position,
+      requirements: arrayToLines(position.requirements),
+    });
+  };
+
+  const cancel = () => {
+    setAdding(false);
+    setEditingId(null);
+    setForm({ ...emptyForm });
+  };
+
+  const submit = async (event) => {
+    event.preventDefault();
+
+    if (!form.title.trim()) {
+      toast.error("Position title is required");
+      return;
+    }
+
+    const payload = {
+      ...form,
+      requirements: linesToArray(form.requirements),
+    };
+
+    try {
+      if (editingId) {
+        await api.put(`/admin/positions/${editingId}`, payload);
+        toast.success("Position updated");
+      } else {
+        await api.post("/admin/positions", payload);
+        toast.success("Position added");
+      }
+
+      cancel();
+      await load();
+    } catch (error) {
+      console.error("Failed to save position:", error);
+
+      toast.error(
+        error.response?.data?.message || "Could not save position"
+      );
+    }
   };
 
   const remove = async (id) => {
-    try { await api.delete(`/admin/positions/${id}`); toast.success("Position removed"); load(); }
-    catch { toast.error("Could not delete"); }
+    const confirmed = window.confirm(
+      "Are you sure you want to remove this position?"
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await api.delete(`/admin/positions/${id}`);
+
+      toast.success("Position removed");
+      await load();
+    } catch (error) {
+      console.error("Failed to remove position:", error);
+      toast.error("Could not delete position");
+    }
   };
 
-  const formOpen = adding || editingId;
+  const formOpen = adding || Boolean(editingId);
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="font-display text-xl font-semibold">Careers ({positions.length})</h2>
-        {!formOpen && (<button onClick={startAdd} className="btn-primary !px-4 !py-2 text-sm"><FaPlus /> Add Position</button>)}
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="font-display text-xl font-semibold">
+          Careers / Positions ({positions.length})
+        </h2>
+
+        {!formOpen && (
+          <button
+            type="button"
+            onClick={startAdd}
+            className="btn-primary !px-4 !py-2 text-sm"
+          >
+            <FaPlus /> Add Position
+          </button>
+        )}
       </div>
 
       {formOpen && (
-        <form onSubmit={submit} className="glass-card mb-6 grid gap-3 p-5 sm:grid-cols-3">
-          <input required placeholder="Position Title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="sm:col-span-3 rounded-lg bg-white/5 px-3 py-2 text-sm ring-1 ring-white/10" />
-          <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="rounded-lg bg-white/5 px-3 py-2 text-sm ring-1 ring-white/10">
-            <option>Full-time</option><option>Part-time</option><option>Contract</option><option>Internship</option>
+        <form
+          onSubmit={submit}
+          className="glass-card mb-6 grid gap-3 p-5 sm:grid-cols-2"
+        >
+          <input
+            required
+            placeholder="Position Title"
+            value={form.title}
+            onChange={(event) =>
+              updateField("title", event.target.value)
+            }
+            className="rounded-lg bg-white/5 px-3 py-2 text-sm ring-1 ring-white/10"
+          />
+
+          <select
+            value={form.type}
+            onChange={(event) =>
+              updateField("type", event.target.value)
+            }
+            className="rounded-lg bg-white/5 px-3 py-2 text-sm ring-1 ring-white/10"
+          >
+            {["Full-time", "Part-time", "Internship", "Contract", "Freelance"].map(
+              (type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              )
+            )}
           </select>
-          <select value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} className="rounded-lg bg-white/5 px-3 py-2 text-sm ring-1 ring-white/10">
-            <option>Remote</option><option>Hybrid</option><option>On-site</option>
-          </select>
-          <input placeholder="Experience (e.g. 1-3 years / Fresher)" value={form.experience} onChange={(e) => setForm({ ...form, experience: e.target.value })} className="rounded-lg bg-white/5 px-3 py-2 text-sm ring-1 ring-white/10" />
-          <div className="sm:col-span-3">
-            <label className="mb-1 block text-xs text-white/50">Job Description</label>
-            <textarea rows={4} placeholder="Describe the role, responsibilities, what the person will work on..." value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full rounded-lg bg-white/5 px-3 py-2 text-sm ring-1 ring-white/10" />
-          </div>
-          <div className="sm:col-span-3">
-            <label className="mb-1 block text-xs text-white/50">Requirements (one per line)</label>
-            <textarea rows={4} placeholder={"Strong knowledge of React\nExperience with REST APIs\nGood communication skills"} value={form.requirements} onChange={(e) => setForm({ ...form, requirements: e.target.value })} className="w-full rounded-lg bg-white/5 px-3 py-2 text-sm ring-1 ring-white/10" />
-          </div>
-          <label className="flex items-center gap-2 text-sm text-white/60 sm:col-span-3">
-            <input type="checkbox" checked={form.isActive} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} /> Published (visible on the Careers page)
+
+          <input
+            placeholder="Location (e.g. Remote)"
+            value={form.location}
+            onChange={(event) =>
+              updateField("location", event.target.value)
+            }
+            className="rounded-lg bg-white/5 px-3 py-2 text-sm ring-1 ring-white/10"
+          />
+
+          <input
+            placeholder="Experience (e.g. Fresher)"
+            value={form.experience}
+            onChange={(event) =>
+              updateField("experience", event.target.value)
+            }
+            className="rounded-lg bg-white/5 px-3 py-2 text-sm ring-1 ring-white/10"
+          />
+
+          <textarea
+            placeholder="Job Description"
+            value={form.description}
+            onChange={(event) =>
+              updateField("description", event.target.value)
+            }
+            className="rounded-lg bg-white/5 px-3 py-2 text-sm ring-1 ring-white/10 sm:col-span-2"
+          />
+
+          <textarea
+            rows={5}
+            placeholder={"Requirements (one per line)\nExample:\nReact basics\nJavaScript knowledge"}
+            value={form.requirements}
+            onChange={(event) =>
+              updateField("requirements", event.target.value)
+            }
+            className="rounded-lg bg-white/5 px-3 py-2 text-sm ring-1 ring-white/10 sm:col-span-2"
+          />
+
+          <label className="flex items-center gap-2 text-sm text-white/60 sm:col-span-2">
+            <input
+              type="checkbox"
+              checked={Boolean(form.isActive)}
+              onChange={(event) =>
+                updateField("isActive", event.target.checked)
+              }
+            />
+            Published (visible on the live site)
           </label>
-          <div className="flex gap-2 sm:col-span-3">
-            <button className="btn-primary flex-1 justify-center"><FaSave /> {editingId ? "Save Changes" : "Add Position"}</button>
-            <button type="button" onClick={cancel} className="btn-outline flex-1 justify-center"><FaTimes /> Cancel</button>
+
+          <div className="flex gap-2 sm:col-span-2">
+            <button
+              type="submit"
+              className="btn-primary flex-1 justify-center"
+            >
+              <FaSave />
+              {editingId ? "Save Changes" : "Add Position"}
+            </button>
+
+            <button
+              type="button"
+              onClick={cancel}
+              className="btn-outline flex-1 justify-center"
+            >
+              <FaTimes /> Cancel
+            </button>
           </div>
         </form>
       )}
 
-      <div className="overflow-hidden rounded-2xl border border-white/10">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-white/5"><tr><th className="p-4">Title</th><th className="p-4">Type</th><th className="p-4">Location</th><th className="p-4">Experience</th><th className="p-4">Actions</th></tr></thead>
+      <div className="overflow-x-auto rounded-2xl border border-white/10">
+        <table className="w-full min-w-[650px] text-left text-sm">
+          <thead className="bg-white/5">
+            <tr>
+              <th className="p-4">Position</th>
+              <th className="p-4">Type</th>
+              <th className="p-4">Location</th>
+              <th className="p-4">Status</th>
+              <th className="p-4">Actions</th>
+            </tr>
+          </thead>
+
           <tbody>
-            {positions.map((p) => (
-              <tr key={p._id} className="border-t border-white/10">
-                <td className="p-4">{p.title}</td>
-                <td className="p-4">{p.type}</td>
-                <td className="p-4">{p.location}</td>
-                <td className="p-4">{p.experience || "—"}</td>
-                <td className="p-4 flex gap-3 text-white/60">
-                  <button onClick={() => startEdit(p)} className="hover:text-accent-400"><FaEdit /></button>
-                  <button onClick={() => remove(p._id)} className="hover:text-red-400"><FaTrash /></button>
+            {positions.map((position) => (
+              <tr
+                key={position._id}
+                className="border-t border-white/10"
+              >
+                <td className="p-4">{position.title}</td>
+                <td className="p-4">{position.type}</td>
+                <td className="p-4">{position.location}</td>
+                <td className="p-4">
+                  {position.isActive ? "Published" : "Draft"}
+                </td>
+                <td className="p-4">
+                  <div className="flex gap-3 text-white/60">
+                    <button
+                      type="button"
+                      aria-label={`Edit ${position.title}`}
+                      onClick={() => startEdit(position)}
+                      className="hover:text-accent-400"
+                    >
+                      <FaEdit />
+                    </button>
+
+                    <button
+                      type="button"
+                      aria-label={`Delete ${position.title}`}
+                      onClick={() => remove(position._id)}
+                      className="hover:text-red-400"
+                    >
+                      <FaTrash />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
-            {positions.length === 0 && (<tr><td className="p-4 text-white/40" colSpan={5}>No open positions.</td></tr>)}
+
+            {positions.length === 0 && (
+              <tr>
+                <td
+                  className="p-4 text-white/40"
+                  colSpan={5}
+                >
+                  No positions yet.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
